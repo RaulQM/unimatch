@@ -12,13 +12,14 @@ from loss.flow_loss import flow_loss_func
 
 from evaluate_flow import (validate_chairs, validate_things, validate_sintel, validate_kitti,
                            create_kitti_submission, create_sintel_submission,
-                           inference_flow,
+                           inference_flow, flow_estimation
                            )
 
 from utils.logger import Logger
 from utils import misc
 from utils.dist_utils import get_dist_info, init_dist, setup_for_distributed
 
+import cv2
 
 def get_args_parser():
     parser = argparse.ArgumentParser()
@@ -172,6 +173,13 @@ def main(args):
         setup_for_distributed(args.local_rank == 0)
 
     # model
+    print(args.feature_channels)
+    print(args.num_scales)
+    print(args.upsample_factor)
+    print(args.num_head)
+    print(args.ffn_dim_expansion)
+    print(args.num_transformer_layers)
+    print(args.reg_refine)                
     model = UniMatch(feature_channels=args.feature_channels,
                      num_scales=args.num_scales,
                      upsample_factor=args.upsample_factor,
@@ -348,25 +356,56 @@ def main(args):
 
     # inferece on a dir or video
     if args.inference_dir is not None or args.inference_video is not None:
-        inference_flow(model_without_ddp,
-                       inference_dir=args.inference_dir,
-                       inference_video=args.inference_video,
-                       output_path=args.output_path,
-                       padding_factor=args.padding_factor,
-                       inference_size=args.inference_size,
-                       save_flo_flow=args.save_flo_flow,
-                       attn_type=args.attn_type,
-                       attn_splits_list=args.attn_splits_list,
-                       corr_radius_list=args.corr_radius_list,
-                       prop_radius_list=args.prop_radius_list,
-                       pred_bidir_flow=args.pred_bidir_flow,
-                       pred_bwd_flow=args.pred_bwd_flow,
-                       num_reg_refine=args.num_reg_refine,
-                       fwd_bwd_consistency_check=args.fwd_bwd_check,
-                       save_video=args.save_video,
-                       concat_flow_img=args.concat_flow_img,
-                       )
+        # inference_flow(model_without_ddp,
+        #                inference_dir=args.inference_dir,
+        #                inference_video=args.inference_video,
+        #                output_path=args.output_path,
+        #                padding_factor=args.padding_factor,
+        #                inference_size=args.inference_size,
+        #                save_flo_flow=args.save_flo_flow,
+        #                attn_type=args.attn_type,
+        #                attn_splits_list=args.attn_splits_list,
+        #                corr_radius_list=args.corr_radius_list,
+        #                prop_radius_list=args.prop_radius_list,
+        #                pred_bidir_flow=args.pred_bidir_flow,
+        #                pred_bwd_flow=args.pred_bwd_flow,
+        #                num_reg_refine=args.num_reg_refine,
+        #                fwd_bwd_consistency_check=args.fwd_bwd_check,
+        #                save_video=args.save_video,
+        #                concat_flow_img=args.concat_flow_img,
+        #                )
+        
+        image0 = cv2.cvtColor(cv2.imread("demo/custom/00044.png"), cv2.COLOR_BGR2RGB)
+        image1 = cv2.cvtColor(cv2.imread("demo/custom/00045.png"), cv2.COLOR_BGR2RGB)
+        mask0  = (cv2.imread("demo/00044.png", 0).astype(np.float32)) / 255.
 
+        print(args.padding_factor)
+        print(args.inference_size)
+        print(args.attn_type)
+        print(args.attn_splits_list)
+        print(args.corr_radius_list)
+        print(args.prop_radius_list)
+        print(args.num_reg_refine)
+        print(args.pred_bidir_flow)
+        print(args.pred_bwd_flow)
+        print(args.fwd_bwd_check)
+
+        mkpts0, mkpts1 = flow_estimation(model_without_ddp,
+                image0,
+                image1,
+                mask0,
+                padding_factor=args.padding_factor,
+                inference_size=args.inference_size,
+                attn_type=args.attn_type,
+                attn_splits_list=args.attn_splits_list,
+                corr_radius_list=args.corr_radius_list,
+                prop_radius_list=args.prop_radius_list,
+                num_reg_refine=args.num_reg_refine,
+                pred_bidir_flow=args.pred_bidir_flow,
+                pred_bwd_flow=args.pred_bwd_flow,
+                fwd_bwd_consistency_check=args.fwd_bwd_check,
+                )
+                
         return
 
     train_dataset = build_train_dataset(args)
